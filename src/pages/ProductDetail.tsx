@@ -18,6 +18,7 @@ export const ProductDetail: React.FC = () => {
     const [selectedSize, setSelectedSize] = useState<string>('');
     const [quantity, setQuantity] = useState<number>(1);
     const [isFullscreen, setIsFullscreen] = useState(false);
+    const [stockCount, setStockCount] = useState<number | null>(null);
 
     useEffect(() => {
         // First check hardcoded mock products
@@ -28,6 +29,7 @@ export const ProductDetail: React.FC = () => {
             if (foundMock.sizes && foundMock.sizes.length > 0) {
                 setSelectedSize(foundMock.sizes[0]);
             }
+            setStockCount(null); // mock products don't track stock
             setLoading(false);
             return;
         }
@@ -52,6 +54,7 @@ export const ProductDetail: React.FC = () => {
                     category: 'General',
                 });
                 setActiveImage(foundDb.image);
+                setStockCount(foundDb.stock);
             }
             setLoading(false);
         });
@@ -88,12 +91,18 @@ export const ProductDetail: React.FC = () => {
     const fullStars = Math.floor(product.rating);
     const hasHalfStar = product.rating % 1 !== 0;
 
+    const isOutOfStock = stockCount !== null && stockCount === 0;
+    const isLowStock = stockCount !== null && stockCount > 0 && stockCount <= 5;
+    const maxQuantity = stockCount !== null ? stockCount : Infinity;
+
     const handleDecreaseQuantity = () => {
         if (quantity > 1) setQuantity(quantity - 1);
     };
 
     const handleIncreaseQuantity = () => {
-        setQuantity(quantity + 1);
+        if (quantity < maxQuantity) {
+            setQuantity(quantity + 1);
+        }
     };
 
     return (
@@ -149,6 +158,19 @@ export const ProductDetail: React.FC = () => {
 
                     <p className="product-description">{product.description}</p>
 
+                    {/* Stock Status */}
+                    {stockCount !== null && (
+                        <div className="stock-status-detail">
+                            {isOutOfStock ? (
+                                <span className="stock-indicator stock-indicator--out">Out of Stock</span>
+                            ) : isLowStock ? (
+                                <span className="stock-indicator stock-indicator--low">Only {stockCount} left in stock!</span>
+                            ) : (
+                                <span className="stock-indicator stock-indicator--in">In Stock ({stockCount} available)</span>
+                            )}
+                        </div>
+                    )}
+
                     <div className="divider"></div>
 
                     {/* Sizing */}
@@ -185,28 +207,34 @@ export const ProductDetail: React.FC = () => {
                             <button
                                 className="quantity-btn"
                                 onClick={handleIncreaseQuantity}
+                                disabled={quantity >= maxQuantity}
                             >
                                 <Plus size={20} />
                             </button>
                         </div>
-                        <button className="add-to-cart-btn primary-btn" onClick={async () => {
-                            if (!user) {
-                                navigate('/login');
-                                return;
-                            }
-                            if (product) {
-                                await addToCart({
-                                    product_id: product.id,
-                                    name: product.name,
-                                    price: product.price,
-                                    image: product.images?.[0] || product.imageUrl,
-                                    size: selectedSize || undefined,
-                                    quantity,
-                                });
-                                navigate('/cart');
-                            }
-                        }}>
-                            Add to Cart
+                        <button
+                            className={`add-to-cart-btn primary-btn ${isOutOfStock ? 'btn-disabled' : ''}`}
+                            disabled={isOutOfStock}
+                            onClick={async () => {
+                                if (isOutOfStock) return;
+                                if (!user) {
+                                    navigate('/login');
+                                    return;
+                                }
+                                if (product) {
+                                    await addToCart({
+                                        product_id: product.id,
+                                        name: product.name,
+                                        price: product.price,
+                                        image: product.images?.[0] || product.imageUrl,
+                                        size: selectedSize || undefined,
+                                        quantity,
+                                    });
+                                    navigate('/cart');
+                                }
+                            }}
+                        >
+                            {isOutOfStock ? 'Out of Stock' : 'Add to Cart'}
                         </button>
                     </div>
                 </div>

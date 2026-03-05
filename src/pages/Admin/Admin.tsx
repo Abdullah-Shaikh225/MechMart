@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect } from "react";
-import { saveProduct, getProducts, deleteProduct } from "../../utils/productStorage";
+import { saveProduct, getProducts, deleteProduct, updateProductStock } from "../../utils/productStorage";
 import type { Product } from "../../types/product";
 import { supabase } from "../../lib/supabase";
-import { Upload, X, Trash2, Star, Users, Package, List } from "lucide-react";
+import { Upload, X, Trash2, Star, Users, Package, List, Pencil, Check } from "lucide-react";
 import "./Admin.css";
 
 interface RegisteredUser {
@@ -23,7 +23,8 @@ const Admin = () => {
         price: 0,
         discountPercentage: 0,
         rating: 0,
-        image: ""
+        image: "",
+        stock: 0
     });
     const [isDragging, setIsDragging] = useState(false);
     const [imagePreview, setImagePreview] = useState<string>("");
@@ -33,6 +34,10 @@ const Admin = () => {
     // --- Users State ---
     const [users, setUsers] = useState<RegisteredUser[]>([]);
     const [usersLoading, setUsersLoading] = useState(false);
+
+    // --- Inline Stock Edit State ---
+    const [editingStockId, setEditingStockId] = useState<string | null>(null);
+    const [editingStockValue, setEditingStockValue] = useState<number>(0);
 
     const refreshProducts = async () => {
         const data = await getProducts();
@@ -121,13 +126,14 @@ const Admin = () => {
             id: Date.now().toString(),
             price: Number(formData.price),
             discountPercentage: Number(formData.discountPercentage),
-            rating: Number(formData.rating)
+            rating: Number(formData.rating),
+            stock: Number(formData.stock)
         };
 
         try {
             await saveProduct(newProduct);
             alert("Product added successfully!");
-            setFormData({ id: "", name: "", description: "", price: 0, discountPercentage: 0, rating: 0, image: "" });
+            setFormData({ id: "", name: "", description: "", price: 0, discountPercentage: 0, rating: 0, image: "", stock: 0 });
             setImagePreview("");
             if (fileInputRef.current) fileInputRef.current.value = "";
             refreshProducts();
@@ -142,6 +148,34 @@ const Admin = () => {
             await deleteProduct(id);
             refreshProducts();
         }
+    };
+
+    const handleStockEdit = (product: Product) => {
+        setEditingStockId(product.id);
+        setEditingStockValue(product.stock);
+    };
+
+    const handleStockSave = async (id: string) => {
+        try {
+            await updateProductStock(id, editingStockValue);
+            setEditingStockId(null);
+            refreshProducts();
+        } catch (err) {
+            alert("Failed to update stock.");
+            console.error(err);
+        }
+    };
+
+    const getStockBadgeClass = (stock: number) => {
+        if (stock === 0) return "stock-badge stock-badge--out";
+        if (stock <= 5) return "stock-badge stock-badge--low";
+        return "stock-badge stock-badge--in";
+    };
+
+    const getStockLabel = (stock: number) => {
+        if (stock === 0) return "Out of Stock";
+        if (stock <= 5) return `Low Stock (${stock})`;
+        return `In Stock (${stock})`;
     };
 
     return (
@@ -192,9 +226,15 @@ const Admin = () => {
                                 <input id="discountPercentage" name="discountPercentage" type="number" placeholder="Discount %" value={formData.discountPercentage || ""} onChange={handleChange} />
                             </div>
                         </div>
-                        <div className="form-group">
-                            <label htmlFor="rating">Rating (0 - 5)</label>
-                            <input id="rating" name="rating" type="number" step="0.1" min="0" max="5" placeholder="Rating" value={formData.rating || ""} onChange={handleChange} />
+                        <div className="form-row">
+                            <div className="form-group">
+                                <label htmlFor="rating">Rating (0 - 5)</label>
+                                <input id="rating" name="rating" type="number" step="0.1" min="0" max="5" placeholder="Rating" value={formData.rating || ""} onChange={handleChange} />
+                            </div>
+                            <div className="form-group">
+                                <label htmlFor="stock">Stock Quantity</label>
+                                <input id="stock" name="stock" type="number" min="0" placeholder="Stock quantity" value={formData.stock || ""} onChange={handleChange} required />
+                            </div>
                         </div>
 
                         {/* Drag & Drop Image */}
@@ -247,6 +287,34 @@ const Admin = () => {
                                             <span className="admin-product-rating">
                                                 <Star size={14} fill="#FFC633" color="#FFC633" /> {product.rating}
                                             </span>
+                                        </div>
+                                        {/* Inline Stock Editor */}
+                                        <div className="admin-stock-row">
+                                            {editingStockId === product.id ? (
+                                                <div className="admin-stock-edit">
+                                                    <input
+                                                        type="number"
+                                                        min="0"
+                                                        className="admin-stock-input"
+                                                        value={editingStockValue}
+                                                        onChange={(e) => setEditingStockValue(Number(e.target.value))}
+                                                        onKeyDown={(e) => { if (e.key === 'Enter') handleStockSave(product.id); }}
+                                                        autoFocus
+                                                    />
+                                                    <button className="admin-stock-save-btn" onClick={() => handleStockSave(product.id)}>
+                                                        <Check size={14} />
+                                                    </button>
+                                                </div>
+                                            ) : (
+                                                <div className="admin-stock-display">
+                                                    <span className={getStockBadgeClass(product.stock)}>
+                                                        {getStockLabel(product.stock)}
+                                                    </span>
+                                                    <button className="admin-stock-edit-btn" onClick={() => handleStockEdit(product)}>
+                                                        <Pencil size={13} />
+                                                    </button>
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                     <button className="admin-delete-btn" onClick={() => handleDelete(product.id)} aria-label="Delete product">

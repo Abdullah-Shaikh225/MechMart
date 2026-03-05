@@ -21,6 +21,18 @@ export const Shop = () => {
         });
     }, []);
 
+    const getStockBadgeClass = (stock: number) => {
+        if (stock === 0) return "stock-card-badge stock-card-badge--out";
+        if (stock <= 5) return "stock-card-badge stock-card-badge--low";
+        return "stock-card-badge stock-card-badge--in";
+    };
+
+    const getStockLabel = (stock: number) => {
+        if (stock === 0) return "Out of Stock";
+        if (stock <= 5) return `Only ${stock} left`;
+        return "In Stock";
+    };
+
     return (
         <div className="shop-page">
             {loading && (
@@ -56,14 +68,23 @@ export const Shop = () => {
                             const discountedPrice = product.discountPercentage > 0
                                 ? product.price - (product.price * product.discountPercentage / 100)
                                 : null;
+                            const isOutOfStock = product.stock === 0;
 
                             return (
-                                <Link to={`/product/${product.id}`} key={product.id} className="product-card">
+                                <Link
+                                    to={isOutOfStock ? "#" : `/product/${product.id}`}
+                                    key={product.id}
+                                    className={`product-card ${isOutOfStock ? "product-card--out-of-stock" : ""}`}
+                                    onClick={(e) => { if (isOutOfStock) e.preventDefault(); }}
+                                >
                                     <div className="product-image-container">
                                         <img src={product.image} alt={product.name} className="product-image" loading="lazy" />
                                         {product.discountPercentage > 0 && (
                                             <span className="discount-badge">-{product.discountPercentage}%</span>
                                         )}
+                                        <span className={getStockBadgeClass(product.stock)}>
+                                            {getStockLabel(product.stock)}
+                                        </span>
                                     </div>
                                     <div className="product-info">
                                         <h3 className="product-title">{product.name}</h3>

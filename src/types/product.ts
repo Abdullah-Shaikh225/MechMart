@@ -6,4 +6,5 @@ export interface Product {
     discountPercentage: number;
     rating: number;
     image: string;
+    stock: number;
 }
